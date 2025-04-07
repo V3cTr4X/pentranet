@@ -1,5 +1,10 @@
 use colored::*; // Importa el trait para usar colores
 use std::io;
+use std::io::Write;
+use std::process::Command;
+use std::env;
+use std::fs;
+use chrono::Local;
 
 fn main() {
     // Imprimir el logo en ASCII en rojo
@@ -75,7 +80,7 @@ fn exit_program() {
 fn scan_network() {
     loop {
         println!(" ------------------------------------------");
-        println!("| >Unleashing the power of the network...< |");
+        println!("{}","| >Unleashing the power of the network...< |".red());
         println!(" ------------------------------------------");
 
         println!("\n1. Basic Scans");
@@ -878,9 +883,173 @@ fn scan_network() {
 
                 println!("\n{}", String::from_utf8_lossy(&output.stdout));
             },
+            45 => handle_multiple_scans(),
+            
 
             46 => break,  
             _ => println!("Invalid option! Please choose a valid option."),
         }
+    }
+}
+
+fn handle_multiple_scans() {
+    println!("\nSelect the numbers of the scans you want to run (separated by commas):\n");
+
+    // Mostrar el menú completo
+    println!("\n1. Basic Scans");
+    println!("\t[1] Active Host Scan");
+    println!("\t[2] Open Port Scan");
+    println!("\t[3] Specific Port Scan");
+    println!("\t[4] List Scan");
+    println!("\n2. Advanced Scans");
+    println!("\t[5] OS Scan");
+    println!("\t[6] Full Network Scan");
+    println!("\t[7] Vulnerability Scan");
+    println!("\t[8] Firewall Detection Scan");
+    println!("\t[9] Traceroute Scan");
+    println!("\t[10] IDS Detection Scan");
+    println!("\n3. Port and Service Scans");
+    println!("\t[12] TCP Port Scan");
+    println!("\t[13] UDP Port Scan");
+    println!("\t[14] Service and Version Scan");
+    println!("\t[15] Stealth Scan (SYN)");
+    println!("\t[16] Banner Grabbing Scan");
+    println!("\t[17] Idle Scan");
+    println!("\t[18] SCTP Init Scan");
+    println!("\t[19] SCTP COOKIE-ECHO Scan");
+    println!("\n4. Aggressive Scans");
+    println!("\t[20] Intensive Scan");
+    println!("\t[21] Full Aggressive Scan");
+    println!("\n5. Scripted Scans");
+    println!("\t[22] HTTP Enumeration");
+    println!("\t[23] SMB OS Discovery");
+    println!("\t[24] DNS Brute Force");
+    println!("\t[25] DNS Zone Transfer");
+    println!("\t[26] FTP Anonymous Login");
+    println!("\t[27] SNMP Information");
+    println!("\t[28] SSL/TLS Scan");
+    println!("\t[29] NTP Monlist");
+    println!("\t[30] SMB Vulnerability Scan");
+    println!("\n6. Evasion and Fragmentation");
+    println!("\t[31] Fragmentation Scan");
+    println!("\t[32] FTP Bounce Scan");
+    println!("\t[33] Decoy Scan");
+    println!("\t[34] Randomize Hosts Order");
+    println!("\t[35] Slow Scan");
+    println!("\t[36] MAC Address Spoofing");
+    println!("\t[37] Bad TCP Checksum Scan");
+    println!("\t[38] IP Protocol Scan");
+    println!("\n7. Specific Purpose Scans");
+    println!("\t[39] IPv6 Scan");
+    println!("\t[41] Timing Templates");
+    println!("\n8. Saving Results");
+    println!("\t[42] Save Results in XML");
+    println!("\t[43] Save Results in Normal Text");
+    println!("\t[44] Save Results in Grepable Format");
+
+    // Pedir target
+    print!("\nEnter target IP or domain: ");
+    io::stdout().flush().unwrap();
+    let mut target = String::new();
+    io::stdin().read_line(&mut target).expect("Failed to read input");
+    let target = target.trim().to_string();
+
+    // Pedir selecciones
+    print!("Enter your selections (e.g. 1,5,14): ");
+    io::stdout().flush().unwrap();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).expect("Failed to read input");
+
+    let selections: Vec<&str> = input.trim().split(',').collect();
+
+    for token in selections {
+        if let Ok(scan_option) = token.trim().parse::<u32>() {
+            println!("\n--- Running scan #[{}] ---", scan_option);
+            handle_scan_option(scan_option, &target);
+        } else {
+            println!("Invalid option: '{}'", token);
+        }
+    }
+}
+
+fn handle_scan_option(option: u32, target: &str) {
+    let home_dir = env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    let results_dir = format!("{}/results", home_dir);
+    fs::create_dir_all(&results_dir).expect("Failed to create results directory");
+
+    let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+    let filename = format!("{}/scan_{}_{}_{}.txt", results_dir, target.replace(".", "_"), option, timestamp);
+
+    // Define a map of scan options to Nmap args
+    let args = match option {
+        1 => vec!["-sn", target], // Active Host Scan
+        2 => vec!["-Pn", target], // Open Port Scan
+        3 => vec!["-p", "80,443", target], // Specific Port Scan (example)
+        4 => vec!["-sL", target], // List Scan
+
+        5 => vec!["-O", target],
+        6 => vec!["-A", target],
+        7 => vec!["--script", "vuln", target],
+        8 => vec!["-sA", target],
+        9 => vec!["--traceroute", target],
+        10 => vec!["--script", "intrusive", target],
+
+        12 => vec!["-sT", target],
+        13 => vec!["-sU", target],
+        14 => vec!["-sV", target],
+        15 => vec!["-sS", target],
+        16 => vec!["--script", "banner", target],
+        17 => vec!["-sI", "zombie_host", target], // Replace zombie_host accordingly
+        18 => vec!["-sY", target],
+        19 => vec!["-sZ", target],
+
+        20 => vec!["-T4", "-A", "-v", target],
+        21 => vec!["-T5", "-A", "-v", target],
+
+        22 => vec!["--script", "http-enum", target],
+        23 => vec!["--script", "smb-os-discovery", target],
+        24 => vec!["--script", "dns-brute", target],
+        25 => vec!["--script", "dns-zone-transfer", target],
+        26 => vec!["--script", "ftp-anon", target],
+        27 => vec!["--script", "snmp-info", target],
+        28 => vec!["--script", "ssl-cert,ssl-enum-ciphers", target],
+        29 => vec!["--script", "ntp-monlist", target],
+        30 => vec!["--script", "smb-vuln*", target],
+
+        31 => vec!["-f", target],
+        32 => vec!["-b", "ftp.example.com", target], // Replace with real FTP bounce target
+        33 => vec!["-D", "RND:10", target],
+        34 => vec!["--randomize-hosts", target],
+        35 => vec!["--scan-delay", "5s", target],
+        36 => vec!["--spoof-mac", "0", target],
+        37 => vec!["--badsum", target],
+        38 => vec!["-sO", target],
+
+        39 => vec!["-6", target],
+        41 => vec!["-T4", target],
+
+        42 => vec!["-oX", &filename, target],
+        43 => vec!["-oN", &filename, target],
+        44 => vec!["-oG", &filename, target],
+
+        _ => {
+            println!("Option {} not implemented.", option);
+            return;
+        }
+    };
+
+    // Run the scan
+    let output = Command::new("nmap")
+        .args(&args)
+        .output()
+        .expect("Failed to run nmap");
+
+    if output.status.success() && option < 42 {
+        fs::write(&filename, output.stdout).expect("Failed to write scan output");
+        println!("Scan #{option} completed. Results saved to: {}", filename);
+    } else if option >= 42 {
+        println!("Scan #{option} completed. Results saved to: {}", filename);
+    } else {
+        eprintln!("Scan #{option} failed: {}", String::from_utf8_lossy(&output.stderr));
     }
 }
